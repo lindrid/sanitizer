@@ -1,0 +1,20 @@
+{
+    "name": "lindrid/sanitizer",
+    "description": "This library validates and normalizes data in accordance with the passed specification.",
+    "type": "library",
+    "license": "open-source",
+    "autoload": {
+        "psr-4": {
+            "Lindrid\\Sanitizer\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Dmitry Fedoroff aka Lindrid",
+            "email": "lindrid32@gmail.com"
+        }
+    ],
+    "require": {
+        "ext-json": "*"
+    }
+}
