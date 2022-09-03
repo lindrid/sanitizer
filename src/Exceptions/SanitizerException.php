@@ -39,6 +39,14 @@ class SanitizerException extends Exception
         return $this->issues[$index];
     }
 
+    /**
+     * @return Issue[]
+     */
+    public function getIssues(): array
+    {
+        return $this->issues;
+    }
+
     private function setMessageAndCode()
     {
         $hasWarnings = $hasErrors = false;

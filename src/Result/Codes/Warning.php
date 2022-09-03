@@ -6,5 +6,5 @@ namespace Lindrid\Sanitizer\Result\Codes;
 
 class Warning
 {
-    const NOT_EQUAL_COUNT = 1_000;
+    const NOT_EQUAL_COUNT = 100;
 }

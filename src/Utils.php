@@ -13,7 +13,7 @@ class Utils
     public static function isSequentialArray($var): bool
     {
         if ($var === []) return true;
-        return array_keys($var) === range(0, count($var) - 1);
+        return is_array($var) && array_keys($var) === range(0, count($var) - 1);
     }
 
     /**
@@ -24,6 +24,14 @@ class Utils
     {
         if ($var === []) return true;
         return is_array($var) && array_keys($var) !== range(0, count($var) - 1);
+       /* if (is_array($var)) {
+            foreach (array_keys($var) as $key) {
+                if (!is_string($key)) {
+                    return false;
+                }
+            }
+        }*/
+        return true;
     }
 
     /**
