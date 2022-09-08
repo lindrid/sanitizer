@@ -5,7 +5,7 @@
 php 7.4
 
 ## Установка
-composer install lindrid/sanitizer
+composer require lindrid/sanitizer:dev-main 
 
 ## Использование
 ```php
