@@ -2,7 +2,7 @@
     "name": "lindrid/sanitizer",
     "description": "This library validates and normalizes json data in accordance with the passed types specification.",
     "type": "library",
-    "license": "open-source",
+    "license": "MIT",
     "autoload": {
         "psr-4": {
             "Lindrid\\Sanitizer\\": "src/"
