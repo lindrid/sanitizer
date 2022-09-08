@@ -6,23 +6,18 @@ namespace Lindrid\Sanitizer;
 
 use JsonException;
 use Lindrid\Sanitizer\Exceptions\SanitizerException;
-use Lindrid\Sanitizer\Result\Messages\Error;
-use Lindrid\Sanitizer\Result\Messages\Warning;
-use Lindrid\Sanitizer\Result\Codes\Warning as WarningCode;
-use Lindrid\Sanitizer\Result\Codes\Error as ErrorCode;
 use Lindrid\Sanitizer\Result\Issue;
-use Lindrid\Sanitizer\Result\IssueType;
 
 class Sanitizer
 {
-    public const SEPARATOR = ':';
-
-    private const IN_ROOT_ROUTE = 'в корне';
-    private const IN_ROUTE = 'для поля %s';
+    private const NESTED_INDEX_SEPARATOR = ':';
+    private const PHONE_FIRST_DIGIT = '7';
+    private const IN_ROOT = 'в корне';
+    private const FOR_FIELD = 'для поля %s';
 
     private array $fields;
     /**
-     * @var Issue[]
+     * @var Issue[][]
      */
     private array $issues;
 
@@ -31,8 +26,10 @@ class Sanitizer
      *      1) скалярные:
      *          new Sanitizer('{"i": 10}', ['i' => Type::INT]);
      *      2) вложенные
+     * Массив из однотипных элементов:
      *          new Sanitizer('{"arr": [1, 2]}',
      *              ['arr' => [Type::Array, Type::INT]]);
+     * Структура (ассоциативный массив с заранее известными ключами):
      *          new Sanitizer('{"map": {"a": 1.5, "b": "str"}}',
      *              ['map' => [Type::MAP, ['a' => Type::FLOAT, 'b' => Type::STRING]]]);
      *
@@ -42,7 +39,7 @@ class Sanitizer
     public function __construct(string $json, array $types)
     {
         $this->fields = [];
-        $this->issues = [];
+        $this->issues = ['warnings' => [], 'errors' => []];
         $fields = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
         $this->validate($fields, $types);
@@ -50,7 +47,7 @@ class Sanitizer
             $this->fields = $this->getNormalized($fields, $types);
         }
 
-        if (!empty($this->issues)) {
+        if (!empty($this->issues['warnings']) || !empty($this->issues['errors'])) {
             throw new SanitizerException($this->issues);
         }
     }
@@ -61,93 +58,90 @@ class Sanitizer
     }
 
     /**
-     * Метод производит валидацию полей (в соответствии с типами) и типов
+     * Метод производит валидацию полей (в соответствии с типами)
      *
      * @param array $fields
      * @param array $types
-     * @param string[] $namePrefixes
+     * @param string[] $namePrefixes служит для отображения имени поля вложенной структуры.
+     * @param bool $isArray = true, если валидируется массив из однотипных элементов
      * @return void
      */
-    private function validate(array $fields, array $types, array $namePrefixes = [])
+    private function validate(array $fields, array $types, array $namePrefixes = [], bool $isArray = false)
     {
         $typesCount = count($types);
         $fieldsCount = count($fields);
 
-        if ($typesCount != $fieldsCount) {
-            $route = empty($namePrefixes) ? self::IN_ROOT_ROUTE :
-                sprintf(self::IN_ROUTE, implode(self::SEPARATOR, $namePrefixes));
-            $this->issues[] = Issue::createWarning('NOT_EQUAL_COUNT', $fieldsCount, $typesCount, $route);
+        if (($typesCount != $fieldsCount) && !$isArray) {
+            $route = empty($namePrefixes) ? self::IN_ROOT :
+                sprintf(self::FOR_FIELD, implode(self::NESTED_INDEX_SEPARATOR, $namePrefixes));
+            $this->issues['warnings'][] = Issue::createWarning('NOT_EQUAL_COUNT', $fieldsCount, $typesCount,
+                $route);
         }
 
         foreach ($fields as $fieldName => $fieldValue) {
             $fieldNameWithPrefix = empty($namePrefixes) ? (string)$fieldName :
-                implode(self::SEPARATOR, $namePrefixes) . self::SEPARATOR . $fieldName;
+                implode(self::NESTED_INDEX_SEPARATOR, $namePrefixes) . self::NESTED_INDEX_SEPARATOR . $fieldName;
 
-            if (key_exists($fieldName, $types)) {
-                if (is_array($types[$fieldName])) {
-                    $this->validateNestedField($fieldName, $fieldValue, $types[$fieldName], $namePrefixes);
+            if (!$isArray && key_exists($fieldName, $types) || $isArray) {
+                $type = $isArray ? $types[1] : $types[$fieldName];
+                if (is_array($type)) {
+                    $this->validateNestedField((string)$fieldName, $fieldValue, $type, $namePrefixes);
                 } else {
-                    $this->validateScalarField($fieldNameWithPrefix, $fieldValue, $types[$fieldName]);
+                    $this->validateScalarField($fieldNameWithPrefix, $fieldValue, $type);
                 }
             } else {
-                $this->issues[] = Issue::createError('FIELD_TYPE_NOT_SET', $fieldNameWithPrefix);
+                $this->issues['errors'][] = Issue::createError('FIELD_TYPE_NOT_SET', $fieldNameWithPrefix);
             }
         }
-    }
-
-    private function validateArray($value, array $int)
-    {
-
     }
 
     private function validateScalarField(string $nameWithPrefix, $value, $type)
     {
         if (Type::isValidScalar($type)) {
             if (!$this->isValidScalarValue($value, $type)) {
-                $this->issues[] = Issue::createInvalidFieldValue($value, $nameWithPrefix, $type);
+                $this->issues['errors'][] = Issue::createInvalidFieldValue($value, $nameWithPrefix, $type);
             }
         } else {
-            $this->issues[] = Issue::createPrettyError('INVALID_SCALAR_FIELD_TYPE', $nameWithPrefix, $type);
+            $this->issues['errors'][] = Issue::createPrettyError('INVALID_SCALAR_FIELD_TYPE',
+                $nameWithPrefix, $type);
         }
     }
 
     private function validateNestedField(string $name, $value, array $type, array $namePrefixes)
     {
         $nameWithPrefix = empty($namePrefixes) ? $name :
-            implode(self::SEPARATOR, $namePrefixes) . self::SEPARATOR . $name;
+            implode(self::NESTED_INDEX_SEPARATOR, $namePrefixes) . self::NESTED_INDEX_SEPARATOR . $name;
 
         if (Type::isValidMap($type)) {
             if (Utils::isAssociativeArray($value)) {
                 $namePrefixes[] = $name;
                 $this->validate($value, $type[1], $namePrefixes);
             } else {
-                $this->issues[] = Issue::createInvalidFieldValue($value, $nameWithPrefix, $type[0]);
+                $this->issues['errors'][] = Issue::createInvalidFieldValue($value, $nameWithPrefix, $type[0]);
             }
         } elseif (Type::isValidArray($type)) {
             if (Utils::isSequentialArray($value)) {
-                if (is_array($type[1])) {
-                    $this->validateArray($value, $type[1]);
-                } else {
-                    foreach ($value as $valueElement) {
-                        if (!$this->isValidScalarValue($valueElement, $type[1])) {
-                            $this->issues[] = Issue::createError('INVALID_ARRAY_ELEMENT_VALUE',
-                                json_encode($valueElement), $nameWithPrefix, strtoupper(Type::getName($type[1])));
+                foreach ($value as $key => $element) {
+                    if (is_array($element) && is_array($type[1])) {
+                        if (empty($namePrefixes)) {
+                            $namePrefixes[] = $name;
+                        }
+                        $namePrefixes[] = $key;
+                        $this->validate($element, $type[1], $namePrefixes, true);
+                    } else {
+                        if (!$this->isValidScalarValue($element, $type[1])) {
+                            $this->issues['errors'][] = Issue::createError('INVALID_ARRAY_ELEMENT_VALUE',
+                                json_encode($element), $nameWithPrefix, strtoupper(Type::getName($type[1])));
                         }
                     }
                 }
             } else {
-                $this->issues[] = Issue::createInvalidFieldValue($value, $nameWithPrefix, $type[0]);
+                $this->issues['errors'][] = Issue::createInvalidFieldValue($value, $nameWithPrefix, $type[0]);
             }
         }
         else {
-            if (isset($type[0]) && Type::isNestedType($type[0])) {
-                $typeName = Type::getName($type[0]);
-                $this->issues[] = Issue::createPrettyError("INVALID_{$typeName}_FIELD_TYPE", $nameWithPrefix,
-                    $type);
-            } else {
-                $this->issues[] = Issue::createPrettyError('INVALID_NESTED_FIELD_TYPE', $nameWithPrefix,
-                    $type);
-            }
+            $this->issues['errors'][] = Issue::createPrettyError("INVALID_NESTED_FIELD_TYPE",
+                $nameWithPrefix, $type);
         }
     }
 
@@ -163,7 +157,7 @@ class Sanitizer
             case Type::STRING:
                 return !is_array($value);
             case Type::PHONE:
-                return Utils::isPhone($value);
+                return Type::isValidPhone($value);
             default:
                 return false;
         }
@@ -171,12 +165,7 @@ class Sanitizer
 
     private function doErrorsExist(): bool
     {
-        foreach ($this->issues as $issue) {
-            if ($issue->getType() === IssueType::ERROR) {
-                return true;
-            }
-        }
-        return false;
+        return !empty($this->issues['errors']);
     }
 
     /**
@@ -199,6 +188,10 @@ class Sanitizer
                     break;
                 case Type::STRING:
                     $normFields[$fieldName] = (string)$fieldValue;
+                    break;
+                case Type::PHONE:
+                    $normFields[$fieldName] = self::PHONE_FIRST_DIGIT .
+                        substr(preg_replace('/[^0-9]/', '', $fieldValue), 1);
                     break;
                 default:
                     if ($types[$fieldName][0] === Type::MAP) {

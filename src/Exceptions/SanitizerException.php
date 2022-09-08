@@ -6,7 +6,6 @@ namespace Lindrid\Sanitizer\Exceptions;
 
 use Exception;
 use Lindrid\Sanitizer\Result\Issue;
-use Lindrid\Sanitizer\Result\IssueType;
 use Throwable;
 
 class SanitizerException extends Exception
@@ -14,53 +13,75 @@ class SanitizerException extends Exception
     /**
      * @var Issue[]
      */
-    private array $issues = [];
+    private array $warnings = [];
+    /**
+     * @var Issue[]
+     */
+    private array $errors = [];
 
     protected $message = '';
-    protected $code = 0;
 
     /**
-     * @param Issue[] $issues
+     * @param Issue[][] $issues
      * @param Throwable|null $previous
      */
     public function __construct(array $issues, Throwable $previous = null)
     {
-        $this->issues = $issues;
-        $this->setMessageAndCode();
-        parent::__construct($this->message, $this->code, $previous);
+        $this->warnings = $issues['warnings'];
+        $this->errors = $issues['errors'];
+        $this->makeMessage();
+        parent::__construct($this->message, 0, $previous);
     }
 
     /**
      * @param int $index
      * @return Issue
      */
-    public function getIssue(int $index): Issue
+    public function getWarning(int $index): Issue
     {
-        return $this->issues[$index];
+        return $this->warnings[$index];
     }
 
     /**
      * @return Issue[]
      */
-    public function getIssues(): array
+    public function getWarnings(): array
     {
-        return $this->issues;
+        return $this->warnings;
     }
 
-    private function setMessageAndCode()
+    /**
+     * @param int $index
+     * @return Issue
+     */
+    public function getError(int $index): Issue
     {
-        $hasWarnings = $hasErrors = false;
-        foreach ($this->issues as $issue) {
-            if (!$hasWarnings && $issue->getType() === IssueType::WARNING) {
-                $this->message .= "Warnings: \n";
-                $hasWarnings = true;
-            }
-            if (!$hasErrors && $issue->getType() === IssueType::ERROR) {
-                $this->message .= "Errors: \n";
-                $hasErrors = true;
+        return $this->errors[$index];
+    }
+
+    /**
+     * @return Issue[]
+     */
+    public function getErrors(): array
+    {
+        return $this->errors;
+    }
+
+    private function makeMessage()
+    {
+        $this->makeMessageOutOf('warnings', 'Warnings:');
+        $this->makeMessageOutOf('errors', 'Errors:');
+    }
+
+    private function makeMessageOutOf(string $arrayName, string $header)
+    {
+        $hasHeader = false;
+        foreach ($this->$arrayName as $issue) {
+            if (!$hasHeader) {
+                $this->message .= "$header \n";
+                $hasHeader = true;
             }
             $this->message .= $issue->getMessage() . "\n";
-            $this->code += $issue->getCode();
         }
     }
 }

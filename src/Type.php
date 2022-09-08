@@ -41,6 +41,17 @@ class Type
         return is_int($type) && in_array($type, range(0, 3));
     }
 
+    public static function isValidPhone($value): bool
+    {
+        if (is_array($value)) {
+            return false;
+        }
+        $value = str_replace(' ', '', $value);
+        $match1 = preg_match("/^((\+7)|7|8)[0-9]{10}$/", $value);
+        $match2 = preg_match("/^((\+7)|7|8)\([0-9]{3}\)[0-9]{3}\-[0-9]{2}\-[0-9]{2}$/", $value);
+        return $match1 || $match2;
+    }
+
     /**
      * @param mixed $type
      * @return bool
@@ -60,26 +71,18 @@ class Type
 
     public static function isValidArray($type)
     {
-        if (is_array($type)
+        if (Utils::isSequentialArray($type)
             && count($type) === 2
             && $type[0] === self::ARRAY
-            && (self::isValidScalar($type[1]) || Utils::isAssociativeArray($type[1]))
+            && (
+                self::isValidScalar($type[1]) ||
+                (Utils::isSequentialArray($type[1]) && count($type[1]) === 2)
+            )
         ) {
-            return true;
+                return true;
         }
 
         return false;
-    }
-
-    /**
-     * Метод проверяет является ли тип одним из вложенных типов (map, array)
-     *
-     * @param $type
-     * @return bool
-     */
-    public static function isNestedType($type): bool
-    {
-        return is_int($type) && in_array($type, self::getNested());
     }
 
     /**
@@ -102,15 +105,5 @@ class Type
     {
         $oClass = new ReflectionClass(__CLASS__);
         return $oClass->getConstants();
-    }
-
-    /**
-     * Возвращает список всех составных типов в виде целочисленных значений
-     *
-     * @return int[]
-     */
-    public static function getNested(): array
-    {
-        return [self::MAP, self::ARRAY];
     }
 }

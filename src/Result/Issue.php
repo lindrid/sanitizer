@@ -4,12 +4,7 @@ declare(strict_types=1);
 
 namespace Lindrid\Sanitizer\Result;
 
-use Lindrid\Sanitizer\Result\Codes\Warning as WarningCode;
-use Lindrid\Sanitizer\Result\Messages\Warning;
-use Lindrid\Sanitizer\Result\Messages\Error;
-use Lindrid\Sanitizer\Result\Codes\Error as ErrorCode;
 use Lindrid\Sanitizer\Type;
-use ReflectionClass;
 
 class Issue
 {
@@ -26,7 +21,6 @@ class Issue
 
     /**
      * Возвращает Issue типа Error с текстом ошибки, взятым из Error::$errorConstName.
-     * Форматирует текст ошибки для удобочитаемости.
      * Заменяет значения констант типов на их имена.
      *
      * @param string $errorConstName
@@ -36,19 +30,21 @@ class Issue
      */
     public static function createPrettyError(string $errorConstName, string $name, $type): Issue
     {
-        $prettyType = str_replace(
-            [':', '{', '}'],
-            ['=>', '[', ']'],
-            json_encode($type)
-        );
+        $typeJson = json_encode($type);
 
         $patterns = $replacements = [];
         foreach (Type::getAll() as $typeConst) {
-            $patterns[] = "/(\[|>|,)$typeConst(,|]|})/i";
+            $patterns[] = "/(\[|>|,|:)$typeConst(,|\]|})/";
             $replacements[] = '$1' . 'Type::' . Type::getName($typeConst) . '$2';
         }
 
-        return self::createError($errorConstName, $name, preg_replace($patterns, $replacements, $prettyType));
+        $afterReplace = $typeJson;
+        do {
+            $beforeReplace = $afterReplace;
+            $afterReplace = preg_replace($patterns, $replacements, $beforeReplace);
+        } while ($beforeReplace != $afterReplace);
+
+        return self::createError($errorConstName, $name, $afterReplace);
     }
 
     /**
