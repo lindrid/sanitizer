@@ -1,6 +1,6 @@
 {
     "name": "lindrid/sanitizer",
-    "description": "This library validates and normalizes data in accordance with the passed specification.",
+    "description": "This library validates and normalizes json data in accordance with the passed types specification.",
     "type": "library",
     "license": "open-source",
     "autoload": {
