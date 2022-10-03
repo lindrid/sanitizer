@@ -1,5 +1,6 @@
 <?php
 
+require '../vendor/autoload.php';
 use Lindrid\Sanitizer\Exceptions\SanitizerException;
 use Lindrid\Sanitizer\Result\Codes\Warning as WarningCode;
 use Lindrid\Sanitizer\Result\Codes\Error as ErrorCode;
@@ -10,6 +11,10 @@ use PHPUnit\Framework\TestCase;
 
 class SanitizerTest extends TestCase
 {
+    /**
+     * @throws SanitizerException
+     * @throws JsonException
+     */
     public function testInstantiationOfSanitizer()
     {
         $s = new Sanitizer('{}', []);
@@ -232,14 +237,8 @@ class SanitizerTest extends TestCase
         $this->assertEquals('Количество JSON полей (3 шт.) не совпадает с количеством типов полей (2 шт.) в корне',
             $warning->getMessage()
         );
-        $this->assertEquals("Warnings: 
-Количество JSON полей (3 шт.) не совпадает с количеством типов полей (2 шт.) в корне
-Количество JSON полей (3 шт.) не совпадает с количеством типов полей (2 шт.) для поля m
-Количество JSON полей (1 шт.) не совпадает с количеством типов полей (0 шт.) для поля m:m1
-Errors: 
-Тип поля \"m:f\" не задан!
-Тип поля \"m:m1:p\" не задан!
-Тип поля \"b\" не задан!\n", $message);
+        $this->assertEquals("Warnings: \nКоличество JSON полей (3 шт.) не совпадает с количеством типов полей (2 шт.) в корне\nКоличество JSON полей (3 шт.) не совпадает с количеством типов полей (2 шт.) для поля m\nКоличество JSON полей (1 шт.) не совпадает с количеством типов полей (0 шт.) для поля m:m1\nErrors: \nТип поля \"m:f\" не задан!\nТип поля \"m:m1:p\" не задан!\nТип поля \"b\" не задан!\n",
+            $message);
     }
 
     public function testInvalidScalarFieldType()

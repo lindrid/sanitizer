@@ -18,9 +18,6 @@ class Type
     const STRING = 2;
     const PHONE = 3;
 
-    // при добавлении скалярного типа, вносим правки в isValidScalar()
-    // при добавлении составного типа, вносим правки в getNested()
-
     /**
      * тип элемента мэпа может быть любым
      */
@@ -38,7 +35,7 @@ class Type
      */
     public static function isValidScalar($type): bool
     {
-        return is_int($type) && in_array($type, range(0, 3));
+        return is_int($type) && in_array($type, self::getScalarTypes());
     }
 
     public static function isValidPhone($value): bool
@@ -97,7 +94,8 @@ class Type
     }
 
     /**
-     * Возвращает список всех типов в виде целочисленных значений
+     * Возвращает список всех типов в виде ассоциативного массива
+     * [Имя_типа] => значение
      *
      * @return int[]
      */
@@ -105,5 +103,18 @@ class Type
     {
         $oClass = new ReflectionClass(__CLASS__);
         return $oClass->getConstants();
+    }
+    /**
+     * Возвращает список скалярных типов в виде ассоциативного массива
+     * [Имя_типа] => значение
+     *
+     * @return int[]
+     */
+    public static function getScalarTypes(): array
+    {
+        $all = self::getAll();
+        do $scalars[] = current($all);
+        while (next($all) !== self::MAP);
+        return $scalars;
     }
 }
